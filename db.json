@@ -79,6 +79,27 @@
       "createdAt": "2025-04-09T06:54:42.058Z",
       "updatedAt": "2025-04-09T06:54:43.069Z",
       "resultId": "99e916a2-e5c0-454c-813a-ec271f3794d6"
+    },
+    {
+      "id": "0ec11cac-a17a-449b-8cc6-cd26b7bf1d82",
+      "status": "completed",
+      "progress": 100,
+      "message": "视频处理完成",
+      "requestData": {
+        "avatarUrl": "https://example.com/avatar.jpg",
+        "username": "测试用户",
+        "content": "测试视频内容 #测试标签#",
+        "imageUrls": [
+          "https://example.com/image1.jpg",
+          "https://example.com/image2.jpg"
+        ],
+        "deviceInfo": "iPhone 14 Pro",
+        "timestamp": "2025-04-09T15:30:45Z",
+        "ipRegion": "北京市"
+      },
+      "createdAt": "2025-04-09T06:59:50.996Z",
+      "updatedAt": "2025-04-09T07:00:04.046Z",
+      "resultId": "0e9737d8-9dd6-48f3-bc9e-0b461c0c1a8d"
     }
   ],
   "video_results": [
@@ -125,6 +146,26 @@
     {
       "id": "99e916a2-e5c0-454c-813a-ec271f3794d6",
       "taskId": "32c2ba71-ed2a-4619-abbe-3c48bdeca736",
+      "success": true,
+      "data": {
+        "watermarked_video": {
+          "url": "http://example.com/videos/video_with_watermark.mp4",
+          "cover": "http://example.com/covers/cover_with_watermark.jpg",
+          "duration": 120,
+          "format": "mp4"
+        },
+        "non_watermarked_video": {
+          "url": "http://example.com/videos/video_without_watermark.mp4",
+          "cover": "http://example.com/covers/cover_without_watermark.jpg",
+          "duration": 120,
+          "format": "mp4"
+        }
+      },
+      "message": "视频处理成功"
+    },
+    {
+      "id": "0e9737d8-9dd6-48f3-bc9e-0b461c0c1a8d",
+      "taskId": "0ec11cac-a17a-449b-8cc6-cd26b7bf1d82",
       "success": true,
       "data": {
         "watermarked_video": {
