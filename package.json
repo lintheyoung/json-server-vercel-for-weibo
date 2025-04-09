@@ -1,12 +1,14 @@
 {
   "name": "json-server-vercel",
   "version": "1.0.0",
-  "description": "Deploy JSON Server to Vercel",
+  "description": "Deploy JSON Server to Vercel with video processing",
   "main": "api/server.js",
   "scripts": {
     "start": "node api/server.js"
   },
   "dependencies": {
-    "json-server": "^0.17.4"
+    "json-server": "^0.17.4",
+    "uuid": "^9.0.1",
+    "cors": "^2.8.5"
   }
 }
