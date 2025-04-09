@@ -6,59 +6,73 @@ const path = require('path')
 const uuid = require('uuid')
 const cors = require('cors')
 
-// Enable file write operations
-const filePath = path.join('db.json')
-const router = jsonServer.router(filePath)
+// Important: Use different approaches for local vs Vercel
+const isVercel = process.env.VERCEL === '1';
+let router;
 
-// 处理延迟阶段定义
+if (isVercel) {
+  // In Vercel: Use embedded data approach
+  const data = require('../db.json');
+  router = jsonServer.router(data);
+} else {
+  // Local: Use file-based approach
+  const filePath = path.join('db.json');
+  router = jsonServer.router(filePath);
+}
+
+// Define processing stages (shortened for Vercel)
 const PROCESSING_STAGES = [
-  { progress: 10, message: "正在下载视频资源", time: 2000 },
-  { progress: 30, message: "正在添加水印", time: 3000 },
-  { progress: 60, message: "正在生成无水印版本", time: 3000 },
-  { progress: 80, message: "正在生成视频封面", time: 2000 },
-  { progress: 95, message: "正在上传处理结果", time: 1000 },
+  { progress: 30, message: "正在处理视频资源", time: 500 },
+  { progress: 70, message: "正在生成视频版本", time: 500 },
   { progress: 100, message: "视频处理完成", time: 0 }
 ];
 
-// 失败场景定义
+// Define failure scenarios
 const FAILURE_SCENARIOS = [
-  { stage: 0, message: "下载视频资源失败，请检查网络连接" },
-  { stage: 1, message: "水印添加失败，视频格式不兼容" },
-  { stage: 2, message: "无水印版本生成失败，处理超时" },
-  { stage: 3, message: "视频封面生成失败，素材分辨率过低" },
-  { stage: 4, message: "上传处理结果失败，服务器存储空间不足" }
+  { stage: 0, message: "视频资源处理失败" },
+  { stage: 1, message: "视频封面生成失败，素材分辨率过低" }
 ];
 
-// 读取db.json内容
-function readDb() {
-  const content = fs.readFileSync(filePath, "utf8");
-  return JSON.parse(content);
+// Helper function for Vercel - simulates db operations using in-memory data
+const inMemoryDb = {
+  tasks: [],
+  video_results: []
+};
+
+// Read data function (works in both environments)
+function readData() {
+  if (isVercel) {
+    return JSON.parse(JSON.stringify(inMemoryDb));
+  } else {
+    const content = fs.readFileSync(path.join('db.json'), "utf8");
+    return JSON.parse(content);
+  }
 }
 
-// 写入db.json内容
-function writeDb(data) {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
+// Write data function (works in both environments)
+function writeData(data) {
+  if (isVercel) {
+    // In Vercel, update in-memory data
+    inMemoryDb.tasks = data.tasks || [];
+    inMemoryDb.video_results = data.video_results || [];
+  } else {
+    // Local, write to file
+    fs.writeFileSync(path.join('db.json'), JSON.stringify(data, null, 2), "utf8");
+  }
 }
 
-// 更新任务状态
+// Update task status
 function updateTaskStatus(taskId, status, progress, message, result = null) {
-  const db = readDb();
+  const db = readData();
   
-  // 初始化tasks数组（如果不存在）
-  if (!db.tasks) {
-    db.tasks = [];
-  }
+  // Initialize arrays if needed
+  if (!db.tasks) db.tasks = [];
+  if (!db.video_results) db.video_results = [];
   
-  // 初始化video_results数组（如果不存在）
-  if (!db.video_results) {
-    db.video_results = [];
-  }
-  
-  // 查找任务
+  // Find and update task
   const taskIndex = db.tasks.findIndex(task => task.id === taskId);
   if (taskIndex === -1) return;
   
-  // 更新任务
   db.tasks[taskIndex] = {
     ...db.tasks[taskIndex],
     status,
@@ -67,7 +81,7 @@ function updateTaskStatus(taskId, status, progress, message, result = null) {
     updatedAt: new Date().toISOString()
   };
   
-  // 如果处理完成或失败，添加结果到video_results并关联到任务
+  // Add result if needed
   if ((status === "completed" || status === "failed") && result) {
     const resultId = uuid.v4();
     db.video_results.push({
@@ -78,105 +92,67 @@ function updateTaskStatus(taskId, status, progress, message, result = null) {
     db.tasks[taskIndex].resultId = resultId;
   }
   
-  writeDb(db);
+  writeData(db);
 }
 
-// 模拟视频处理过程
+// Simplified video processing for Vercel
 function processVideo(taskId, requestData) {
-  // 设置初始状态为处理中
-  updateTaskStatus(taskId, "processing", 0, "开始处理视频");
+  // For Vercel, we'll handle this as a simulated immediate response
+  // Instead of real async processing with multiple stages
   
-  // 模拟处理各个阶段
-  let currentStage = 0;
-  
-  // 决定这个任务是否会失败 (20%的失败率)
+  // Decide if task will fail (20% chance)
   const willFail = Math.random() < 0.2;
   
-  // 如果要失败，随机选择一个失败的阶段
-  let failureStage = -1;
-  let failureMessage = "";
-  
   if (willFail) {
+    // Create failure result
     const randomFailure = FAILURE_SCENARIOS[Math.floor(Math.random() * FAILURE_SCENARIOS.length)];
-    failureStage = randomFailure.stage;
-    failureMessage = randomFailure.message;
-  }
-  
-  function processNextStage() {
-    // 检查是否应该在当前阶段失败
-    if (currentStage === failureStage) {
-      // 创建失败结果
-      const failureResult = {
-        success: false,
-        data: null,
-        message: failureMessage,
-        error_code: 500 + currentStage // 简单的错误代码生成
-      };
-      
-      updateTaskStatus(taskId, "failed", PROCESSING_STAGES[currentStage].progress, failureMessage, failureResult);
-      return;
-    }
+    const failureResult = {
+      success: false,
+      data: null,
+      message: randomFailure.message,
+      error_code: 503
+    };
     
-    if (currentStage >= PROCESSING_STAGES.length) {
-      // 所有阶段完成，生成结果
-      const result = {
-        success: true,
-        data: {
-          watermarked_video: {
-            url: "http://example.com/videos/video_with_watermark.mp4",
-            cover: "http://example.com/covers/cover_with_watermark.jpg",
-            duration: 120,
-            format: "mp4"
-          },
-          non_watermarked_video: {
-            url: "http://example.com/videos/video_without_watermark.mp4",
-            cover: "http://example.com/covers/cover_without_watermark.jpg",
-            duration: 120,
-            format: "mp4"
-          }
+    updateTaskStatus(taskId, "failed", 70, randomFailure.message, failureResult);
+  } else {
+    // Create success result
+    const result = {
+      success: true,
+      data: {
+        watermarked_video: {
+          url: "http://example.com/videos/video_with_watermark.mp4",
+          cover: "http://example.com/covers/cover_with_watermark.jpg",
+          duration: 120,
+          format: "mp4"
         },
-        message: "视频处理成功"
-      };
-      
-      updateTaskStatus(taskId, "completed", 100, "视频处理完成", result);
-      return;
-    }
+        non_watermarked_video: {
+          url: "http://example.com/videos/video_without_watermark.mp4",
+          cover: "http://example.com/covers/cover_without_watermark.jpg",
+          duration: 120,
+          format: "mp4"
+        }
+      },
+      message: "视频处理成功"
+    };
     
-    const stage = PROCESSING_STAGES[currentStage];
-    updateTaskStatus(taskId, "processing", stage.progress, stage.message);
-    
-    currentStage++;
-    setTimeout(processNextStage, stage.time);
+    updateTaskStatus(taskId, "completed", 100, "视频处理完成", result);
   }
-  
-  // 开始处理第一个阶段
-  setTimeout(processNextStage, 1000);
 }
 
-const middlewares = jsonServer.defaults()
-
-// Use CORS and body parser
+// Setup middleware
 server.use(cors())
 server.use(jsonServer.bodyParser)
-server.use(middlewares)
+server.use(jsonServer.defaults())
 
-// Add custom routes before router
+// Custom routes
 server.post("/api/process-video", (req, res) => {
   const taskId = uuid.v4();
   const requestData = req.body;
   
-  // 创建新任务
-  const db = readDb();
-  
-  // 确保tasks数组存在
-  if (!db.tasks) {
-    db.tasks = [];
-  }
-  
-  // 确保video_results数组存在
-  if (!db.video_results) {
-    db.video_results = [];
-  }
+  // Create new task
+  const db = readData();
+  if (!db.tasks) db.tasks = [];
+  if (!db.video_results) db.video_results = [];
   
   const newTask = {
     id: taskId,
@@ -189,14 +165,19 @@ server.post("/api/process-video", (req, res) => {
   };
   
   db.tasks.push(newTask);
-  writeDb(db);
+  writeData(db);
   
-  // 模拟异步处理
-  setTimeout(() => {
+  // In Vercel, process immediately instead of with setTimeout
+  if (isVercel) {
     processVideo(taskId, requestData);
-  }, 1000);
+  } else {
+    // Locally, use setTimeout for simulation
+    setTimeout(() => {
+      processVideo(taskId, requestData);
+    }, 1000);
+  }
   
-  // 返回任务ID
+  // Return task ID
   res.json({
     task_id: taskId,
     status: "pending",
@@ -204,19 +185,19 @@ server.post("/api/process-video", (req, res) => {
   });
 });
 
-// 查询任务状态的路由
+// Task status endpoint
 server.get("/api/task-status/:id", (req, res) => {
   const taskId = req.params.id;
-  const db = readDb();
+  const db = readData();
   
-  // 查找任务
+  // Find task
   const task = db.tasks ? db.tasks.find(t => t.id === taskId) : null;
   
   if (!task) {
     return res.status(404).json({ error: "任务不存在" });
   }
   
-  // 如果任务已完成或失败并有结果ID，返回结果
+  // Return result if available
   if ((task.status === "completed" || task.status === "failed") && task.resultId) {
     const result = db.video_results.find(r => r.id === task.resultId);
     if (result) {
@@ -224,22 +205,29 @@ server.get("/api/task-status/:id", (req, res) => {
     }
   }
   
-  // 否则返回任务状态
+  // Otherwise return task status
   res.json(task);
 });
 
-// Use original rewriter
+// Add debugging route
+server.get("/api/debug", (req, res) => {
+  res.json({
+    environment: isVercel ? "Vercel" : "Local",
+    memoryData: inMemoryDb,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Standard JSON Server routes
 server.use(jsonServer.rewriter({
   '/api/*': '/$1',
   '/blog/:resource/:id/show': '/:resource/:id'
 }))
 
-// Use router after custom routes
 server.use(router)
 
 server.listen(3000, () => {
   console.log('JSON Server is running')
 })
 
-// Export the Server API
 module.exports = server

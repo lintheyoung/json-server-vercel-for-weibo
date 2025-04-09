@@ -1,7 +1,12 @@
 {
+  "version": 2,
+  "env": {
+    "VERCEL": "1"
+  },
   "functions": {
     "api/server.js": {
       "memory": 1024,
+      "maxDuration": 10,
       "includeFiles": "db.json"
     }
   },
